@@ -17,7 +17,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -76,6 +75,7 @@ import com.vuetify.entities.ForumThread;
 import com.vuetify.entities.PriceAtDate;
 import com.vuetify.entities.UserPreferences;
 import com.vuetify.entities.VideoMaterial;
+import com.vuetify.enums.ComicType;
 import com.vuetify.exceptions.ComicBookNameExistsException;
 import com.vuetify.exceptions.NotLoggedInException;
 import com.vuetify.repositories.AnnouncementRepository;
@@ -169,8 +169,8 @@ public class RESTVuetify {
 
 	
 	@GetMapping("/comicType")
-	public List<Comic> getByComicType(@RequestParam("t") String type) {
-		return comicRepo.findByStatus(type.toLowerCase());
+	public List<Comic> getByComicType(@RequestParam("t") ComicType type) {
+		return comicRepo.findByStatus(type);
 	}
 	
 	@GetMapping("/authors")
@@ -181,7 +181,7 @@ public class RESTVuetify {
 	// Checked for validation - 11/3/2020
 	@PostMapping("/addComic")
 	public ResponseEntity<String> addComic(@RequestHeader("USER-TOKEN") String accessToken,@RequestParam("comicName") String comicName, 
-			@RequestParam("comicDesc") String comicDesc, @RequestParam("releaseStatus") String releaseStatus,@RequestParam("author") String author,
+			@RequestParam("comicDesc") String comicDesc, @RequestParam("releaseStatus") ComicType releaseStatus,@RequestParam("author") String author,
 			@RequestParam("comicCoverURL") String comicCoverURL, @RequestParam("buyComicURL") String buyURL,
 			@RequestParam("seriesURL") String seriesURL, @RequestParam("price") float price) throws MalformedURLException {
 		if (!jwt.decodeJwt(accessToken, "admins")) 
@@ -193,7 +193,7 @@ public class RESTVuetify {
 		}
 		if (comicRepo.findByComicName(comicName) != null) 
 			throw new ComicBookNameExistsException("Comic Book with name " + comicName + " already exists!");
-		Comic comic = new Comic(comicName, comicDesc, LocalDate.now(), author, releaseStatus.toLowerCase(), new URL(comicCoverURL), new URL(buyURL), new URL(seriesURL), price);
+		Comic comic = new Comic(comicName, comicDesc, LocalDate.now(), author, releaseStatus, new URL(comicCoverURL), new URL(buyURL), new URL(seriesURL), price);
 		comicRepo.save(comic);
 		return new ResponseEntity<String>("Comic added successfully!", HttpStatus.OK);
 		
@@ -358,7 +358,7 @@ public class RESTVuetify {
 			return new ResponseEntity<String>("Cannot approve comic!", HttpStatus.FORBIDDEN);
 		ComicSuggestion suggComic = comicSuggestRepo.getOne(comicId);
 		Comic appComic = new Comic(suggComic.getSuggestedComicName(), suggComic.getSuggestedAuthorName(), suggComic.getSuggestedReleaseDate(), 
-				"upcoming", suggComic.getBuyComicURL(), suggComic.getComicCoverURL(), suggComic.getSeriesURL(), suggComic.getPrice());
+				suggComic.getReleaseStatus(), suggComic.getBuyComicURL(), suggComic.getComicCoverURL(), suggComic.getSeriesURL(), suggComic.getPrice());
 		comicRepo.save(appComic);
 		comicSuggestRepo.delete(suggComic);
 		return new ResponseEntity<String>("Successfully approved comic!", HttpStatus.OK);
@@ -620,6 +620,7 @@ public class RESTVuetify {
 	public ResponseEntity<String> addComicSuggestion(@RequestParam("comicName") String comicName,
 			@RequestParam("u") String username,
 			@RequestParam("authorName") String authorName,
+			@RequestParam("releaseStatus") ComicType releaseStatus,
 			@RequestParam("buyURL") URL buyURL,
 			@RequestParam("coverURL") URL coverURL,
 			@RequestParam("seriesURL") URL seriesURL,
@@ -632,7 +633,7 @@ public class RESTVuetify {
 				|| !FieldValidation.isValidUrl(buyURL.toString()) || !FieldValidation.isValidUrl(coverURL.toString()) || !FieldValidation.isValidUrl(seriesURL.toString())
 				|| !FieldValidation.containsOnlyIntegerOrFloat(price) || !FieldValidation.isNotEmptyOrNull(releaseDate))
 			return new ResponseEntity<String>("Something went wrong - check your data and try again!", HttpStatus.BAD_REQUEST);
-		ComicSuggestion sugg = new ComicSuggestion(username, comicName, authorName, releaseDate, buyURL, coverURL, seriesURL, price);
+		ComicSuggestion sugg = new ComicSuggestion(username, comicName,releaseStatus, authorName, releaseDate, buyURL, coverURL, seriesURL, price);
 		comicSuggestRepo.save(sugg);
 		return new ResponseEntity<String> ("Comic suggestion added successfully!", HttpStatus.OK);
 	}
@@ -671,7 +672,7 @@ public class RESTVuetify {
 	
 	@GetMapping("/getAllSuggestions")
 	public List<ComicSuggestion> getAllSuggestions(@RequestHeader("USER-TOKEN") String token) {
-		if (!jwt.decodeJwt(token, "admin")) 
+		if (!jwt.decodeJwt(token, "admins")) 
 			return new ArrayList<ComicSuggestion>();
 		List<ComicSuggestion> suggestions = comicSuggestRepo.findAll();
 		return suggestions;
@@ -721,7 +722,7 @@ public class RESTVuetify {
 	// Checked for validation - 11/14/2020
 	@PostMapping("/editComic")
 	public ResponseEntity<String> editComic(@RequestHeader("USER-TOKEN") String accessToken,@RequestParam("cId") long comicId,@RequestParam("comicName") String comicName, 
-			@RequestParam("comicDesc") String comicDesc, @RequestParam("releaseStatus") String releaseStatus,@RequestParam("author") String author,
+			@RequestParam("comicDesc") String comicDesc, @RequestParam("releaseStatus") ComicType releaseStatus,@RequestParam("author") String author,
 			@RequestParam("comicCoverURL") String comicCoverURL, @RequestParam("seriesURL") URL seriesURL,@RequestParam("price") float price, @RequestParam("buyComicURL") String buyURL) throws MalformedURLException {
 		if (!jwt.decodeJwt(accessToken, "admins")) 
 			return new ResponseEntity<String>("Cannot edit comic!", HttpStatus.BAD_REQUEST);

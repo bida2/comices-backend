@@ -65,9 +65,16 @@ public class BootVuetifyControllerAdvice {
 	 }
 	 
 	 @ExceptionHandler(InvalidPathException.class)
-	 @ResponseStatus(HttpStatus.BAD_REQUEST)
+	 @ResponseStatus(HttpStatus.NOT_FOUND)
 	 @ResponseBody
 	 public ResponseEntity<String> handleInvalidPathException(InvalidPathException e) {
 		 return new ResponseEntity<String>("Cannot find file with that name!", HttpStatus.NOT_FOUND);
+	 }
+	 
+	 @ExceptionHandler(IllegalArgumentException.class)
+	 @ResponseStatus(HttpStatus.BAD_REQUEST)
+	 @ResponseBody
+	 public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException e) {
+		 return new ResponseEntity<String>("Expected data of a different type!", HttpStatus.BAD_REQUEST);
 	 }
 }

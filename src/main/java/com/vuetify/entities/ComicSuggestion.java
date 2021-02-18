@@ -5,8 +5,12 @@ import java.time.LocalDate;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+
+import com.vuetify.enums.ComicType;
 
 @Entity
 public class ComicSuggestion {
@@ -29,9 +33,12 @@ public class ComicSuggestion {
 	private URL comicCoverURL;
 	@Column(name="suggested_series_url", nullable=false)
 	private URL seriesURL;
+	@Enumerated(EnumType.STRING)
+	@Column(name="status",nullable=true)
+	private ComicType releaseStatus;
 	
 	ComicSuggestion() {}
-	public ComicSuggestion(String suggesterUsername, String suggestedComicName,
+	public ComicSuggestion(String suggesterUsername, String suggestedComicName, ComicType releaseStatus,
 			String suggestedAuthorName, LocalDate suggestedReleaseDate, URL buyURL, URL coverURL, URL seriesURL, float price) {
 		this.suggesterUsername = suggesterUsername;
 		this.suggestedComicName = suggestedComicName;
@@ -41,6 +48,7 @@ public class ComicSuggestion {
 		this.comicCoverURL = coverURL;
 		this.seriesURL = seriesURL;
 		this.price = price;
+		this.releaseStatus = releaseStatus;
 	}
 	
 	
@@ -97,6 +105,12 @@ public class ComicSuggestion {
 	}
 	public void setSeriesURL(URL seriesURL) {
 		this.seriesURL = seriesURL;
+	}
+	public ComicType getReleaseStatus() {
+		return releaseStatus;
+	}
+	public void setReleaseStatus(ComicType releaseStatus) {
+		this.releaseStatus = releaseStatus;
 	}
 	
 	

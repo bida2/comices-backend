@@ -9,6 +9,8 @@ import java.util.List;
 import javax.persistence.Column;
 import javax.persistence.ElementCollection;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.OrderColumn;
@@ -25,6 +27,8 @@ import org.hibernate.search.annotations.Parameter;
 import org.hibernate.search.annotations.TermVector;
 import org.hibernate.search.annotations.TokenFilterDef;
 import org.hibernate.search.annotations.TokenizerDef;
+
+import com.vuetify.enums.ComicType;
 
 
 
@@ -50,9 +54,9 @@ public class Comic {
 	private String releaseDateFormatted;
 	@Column(name="author",nullable=true)
 	private String comicAuthor;
-	// Should be either 'released', 'upcoming' or 'classic'
+	@Enumerated(EnumType.STRING)
 	@Column(name="status",nullable=true)
-	private String status;
+	private ComicType status;
 	@Column(name="comic_cover",nullable=true)
 	private URL comicCoverURL;
 	@Column(name="buy_comic_URL",nullable=true)
@@ -67,7 +71,7 @@ public class Comic {
 	private List<PriceAtDate> priceHistory = new ArrayList<PriceAtDate>(0);
 	
 	// Constructors
-	public Comic(String comicName, String comicDesc, LocalDate releaseDate, String comicAuthor, String releaseStatus, URL comicCoverURL, URL buyURL, URL seriesURL, float price) {
+	public Comic(String comicName, String comicDesc, LocalDate releaseDate, String comicAuthor, ComicType releaseStatus, URL comicCoverURL, URL buyURL, URL seriesURL, float price) {
 		this.comicName = comicName;
 		this.comicDesc = comicDesc;
 		this.releaseDate = releaseDate;
@@ -80,7 +84,7 @@ public class Comic {
 		this.seriesURL = seriesURL;
 	}
 	
-	public Comic(String comicName, String comicDesc, LocalDate releaseDate, String comicAuthor, String releaseStatus, URL comicCoverURL, URL buyURL, URL seriesURL, float price, ArrayList<PriceAtDate> history) {
+	public Comic(String comicName, String comicDesc, LocalDate releaseDate, String comicAuthor, ComicType releaseStatus, URL comicCoverURL, URL buyURL, URL seriesURL, float price, ArrayList<PriceAtDate> history) {
 		this.comicName = comicName;
 		this.comicDesc = comicDesc;
 		this.releaseDate = releaseDate;
@@ -94,7 +98,7 @@ public class Comic {
 		this.priceHistory = history;
 	}
 	
-	public Comic(String comicName, String authorName, LocalDate relDate, String releaseStatus, URL buyURL, URL coverURL, URL seriesURL, float price) {
+	public Comic(String comicName, String authorName, LocalDate relDate, ComicType releaseStatus, URL buyURL, URL coverURL, URL seriesURL, float price) {
 		this.comicName = comicName;
 		this.comicAuthor = authorName;
 		this.releaseDate = relDate;
@@ -138,10 +142,10 @@ public class Comic {
 	public void setComicAuthor(String comicAuthor) {
 		this.comicAuthor = comicAuthor;
 	}
-	public String getReleaseStatus() {
+	public ComicType getReleaseStatus() {
 		return status;
 	}
-	public void setReleaseStatus(String releaseStatus) {
+	public void setReleaseStatus(ComicType releaseStatus) {
 		this.status = releaseStatus;
 	}
 	public URL getComicCoverURL() {
@@ -174,15 +178,7 @@ public class Comic {
 	public void setPrice(float price) {
 		this.price = price;
 	}
-
-	public String getStatus() {
-		return status;
-	}
-
-	public void setStatus(String status) {
-		this.status = status;
-	}
-
+	
 	public List<PriceAtDate> getPriceHistory() {
 		return priceHistory;
 	}
