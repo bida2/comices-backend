@@ -109,7 +109,83 @@ public class Comic {
 	
 	public Comic() {}
 	
+	public Comic(Comic.Builder builder) {
+		this.comicName = builder.comicName;
+		this.comicDesc = builder.comicDesc;
+		this.releaseDate = builder.releaseDate;
+		this.comicAuthor=builder.comicAuthor;
+		this.status = builder.status;
+		this.comicCoverURL = builder.comicCoverURL;
+		this.buyURL = builder.buyURL;
+		this.releaseDateFormatted = builder.releaseDate.format(DateTimeFormatter.ofPattern("dd/MM/uuuu"));
+		this.price = builder.price;
+		this.seriesURL = builder.seriesURL;
+		this.priceHistory = builder.priceHistory;
+	}
+	
+	public static class Builder {
+		private String comicName;
+		private String comicDesc;
+		private LocalDate releaseDate;
+		private String comicAuthor;
+		private ComicType status;
+		private URL comicCoverURL;
+		private URL buyURL;
+		private URL seriesURL;
+		private float price;
+		private List<PriceAtDate> priceHistory = new ArrayList<PriceAtDate>(0);
+		
+		public Comic.Builder addComicName(String comicName) {
+			this.comicName = comicName;
+			return this;
+		}
+		public Comic.Builder addComicDesc(String comicDesc) {
+			this.comicDesc = comicDesc;
+			return this;
+		}
+		public Comic.Builder addReleaseDate(LocalDate releaseDate) {
+			this.releaseDate = releaseDate;
+			return this;
+		}
+		public Comic.Builder addComicAuthor(String comicAuthor) {
+			this.comicAuthor = comicAuthor;
+			return this;
+		}
+		public Comic.Builder addComicType(ComicType status) {
+			this.status = status;
+			return this;
+		}
+		public Comic.Builder addCoverUrl(URL comicCoverURL) {
+			this.comicCoverURL = comicCoverURL;
+			return this;
+		}
+		public Comic.Builder addBuyUrl(URL buyURL) {
+			this.buyURL = buyURL;
+			return this;
+		}
+		public Comic.Builder addSeriesUrl(URL seriesURL) {
+			this.seriesURL = seriesURL;
+			return this;
+		}
+		public Comic.Builder addPrice(float price) {
+			this.price = price;
+			return this;
+		}
+		public Comic.Builder addPriceHistory(ArrayList<PriceAtDate> priceHistory) {
+			this.priceHistory = priceHistory;
+			return this;
+		}
+		public Comic build() {
+			Comic builderComic = new Comic(this);
+			return builderComic;
+			
+		}
+ 	}
 
+	// Helper methods 
+	public static Comic.Builder builder() {
+		return new Builder();
+	}
 
 	// Getters and Setters
 	public Long getComicId() {

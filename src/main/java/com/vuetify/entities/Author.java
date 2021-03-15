@@ -18,7 +18,7 @@ public class Author {
 	private LocalDate authorBirthDate;
 	@Column(name="author_residence",nullable=true)
 	private String authorPlace;
-	@Column(name="author_email",nullable=false)
+	@Column(name="author_email",nullable=true)
 	private String authorEmail;
 	//Constructors
 	public Author(String authorName, LocalDate authorBirthDate, String authorPlace, String authorEmail) {

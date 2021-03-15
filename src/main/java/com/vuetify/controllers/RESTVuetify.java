@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -77,7 +76,10 @@ import com.vuetify.entities.UserPreferences;
 import com.vuetify.entities.VideoMaterial;
 import com.vuetify.enums.ComicType;
 import com.vuetify.exceptions.ComicBookNameExistsException;
+import com.vuetify.exceptions.NoComicsForTypeException;
+import com.vuetify.exceptions.NoSuchResourceException;
 import com.vuetify.exceptions.NotLoggedInException;
+import com.vuetify.exceptions.UserNotFoundException;
 import com.vuetify.repositories.AnnouncementRepository;
 import com.vuetify.repositories.AuthorRepository;
 import com.vuetify.repositories.ComicBookNewsRepository;
@@ -160,6 +162,7 @@ public class RESTVuetify {
 	@Autowired
 	private VideoMaterialRepository videoRepo;
 	
+	
 	private JWTDecoder jwt = new JWTDecoder();
 	
 	private static final Gson gson = new Gson();
@@ -169,8 +172,8 @@ public class RESTVuetify {
 
 	
 	@GetMapping("/comicType")
-	public List<Comic> getByComicType(@RequestParam("t") ComicType type) {
-		return comicRepo.findByStatus(type);
+	public List<Comic> getByComicType(@RequestParam("t") ComicType type) throws NoComicsForTypeException {
+		return comicRepo.findByStatus(type).orElseThrow(() -> new NoComicsForTypeException());
 	}
 	
 	@GetMapping("/authors")
@@ -191,9 +194,11 @@ public class RESTVuetify {
 				|| !FieldValidation.isValidUrl(seriesURL) || !FieldValidation.containsOnlyIntegerOrFloat(price)) {
 			return new ResponseEntity<String>("Incorrect data entered - check your data and try again!", HttpStatus.BAD_REQUEST);
 		}
-		if (comicRepo.findByComicName(comicName) != null) 
+		if (comicRepo.findByComicName(comicName).isPresent()) 
 			throw new ComicBookNameExistsException("Comic Book with name " + comicName + " already exists!");
-		Comic comic = new Comic(comicName, comicDesc, LocalDate.now(), author, releaseStatus, new URL(comicCoverURL), new URL(buyURL), new URL(seriesURL), price);
+		Comic comic = Comic.builder().addComicName(comicName).addComicDesc(comicDesc).addReleaseDate(LocalDate.now())
+			.addComicAuthor(author).addComicType(releaseStatus).addCoverUrl(new URL(comicCoverURL))
+				.addSeriesUrl(new URL(seriesURL)).addBuyUrl(new URL(buyURL)).addPrice(price).build();
 		comicRepo.save(comic);
 		return new ResponseEntity<String>("Comic added successfully!", HttpStatus.OK);
 		
@@ -206,8 +211,8 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getVideo")
-	public VideoMaterial getAVideo(@RequestParam("vId") long vId) {
-		return videoRepo.getOne(vId);
+	public VideoMaterial getAVideo(@RequestParam("vId") long vId) throws NoSuchResourceException {
+		return videoRepo.findById(vId).orElseThrow(() -> new NoSuchResourceException("video material"));
 	}
 	
 	// Checked for validation - 11/3/2020
@@ -216,12 +221,12 @@ public class RESTVuetify {
 			@RequestParam("vId") long vId,
 			@RequestParam("videoHeader") String header,
 			@RequestParam("videoContent") String content,
-			@RequestParam("embedUrl") URL embed) throws ScanException, PolicyException {
+			@RequestParam("embedUrl") URL embed) throws ScanException, PolicyException, NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins"))
 			return new ResponseEntity<String>("Cannot edit this video material!", HttpStatus.FORBIDDEN);
 		if (embed == null || !FieldValidation.isValidUrl(embed.toString())) 
 			return new ResponseEntity<String>("Check your entered embed URL and try again!", HttpStatus.BAD_REQUEST);
-		VideoMaterial video = videoRepo.getOne(vId);
+		VideoMaterial video = videoRepo.findById(vId).orElseThrow(() -> new NoSuchResourceException("video material"));;
 		header = miscFunc.sanitizeHTMLAntiSamy(header);
 		content = miscFunc.sanitizeHTMLAntiSamy(content);
 		video.setDescription(content);
@@ -249,9 +254,11 @@ public class RESTVuetify {
 		}
 		VideoMaterial video = null;
 		if (thumbUrl.isEmpty() || thumbUrl == null) {
-			video = new VideoMaterial(new URL(embedUrl), videoTitle, desc, LocalDateTime.now());
+			video = VideoMaterial.builder().addEmbedUrl(new URL(embedUrl))
+					.addSubtitleHeader(videoTitle).addDescription(desc).addTimePosted(LocalDateTime.now()).build();
 		} else {
-			video = new VideoMaterial(new URL(embedUrl), new URL(thumbUrl), videoTitle, desc, LocalDateTime.now());
+			video = VideoMaterial.builder().addEmbedUrl(new URL(embedUrl)).addSubtitleHeader(videoTitle)
+					.addDescription(desc).addTimePosted(LocalDateTime.now()).addThumbnail(new URL(thumbUrl)).build();
 		}
 		videoRepo.save(video);
 		return new ResponseEntity<String>("Successfully saved video material!", HttpStatus.OK);
@@ -264,6 +271,7 @@ public class RESTVuetify {
 			return new ResponseEntity<String>("Cannot remove this video material!", HttpStatus.FORBIDDEN);
 		if (videoRepo.findById(videoId).isPresent()) 
 			videoRepo.deleteById(videoId);
+		else return new ResponseEntity<String>("Couldn't find video material to delete!", HttpStatus.BAD_REQUEST);
 		return new ResponseEntity<String>("Successfully deleted video material!", HttpStatus.OK);
 	}
 	
@@ -273,19 +281,19 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getNewsArticle")
-	public ComicBookNews getNewsArticle(@RequestParam("aId") long articleId)
+	public ComicBookNews getNewsArticle(@RequestParam("aId") long articleId) throws NoSuchResourceException 
 	{
-		return newsRepo.getOne(articleId);
+		return newsRepo.findById(articleId).orElseThrow(() -> new NoSuchResourceException("news article"));
 	}
 	
 	// Checked for validation - 11/3/2020
 	@PutMapping("/editNewsArticle") 
-	public ResponseEntity<String> saveNewsArticleEdits(@RequestHeader("USER-TOKEN") String token,@RequestParam("aId") long aId, @RequestParam("title") String title, @RequestParam("content") String content) throws ScanException, PolicyException {
+	public ResponseEntity<String> saveNewsArticleEdits(@RequestHeader("USER-TOKEN") String token,@RequestParam("aId") long aId, @RequestParam("title") String title, @RequestParam("content") String content) throws ScanException, PolicyException, NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins")) 
 			return new ResponseEntity<String>("Couldn't edit news article!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(title) || !FieldValidation.isNotEmptyOrNull(content)) 
 			return new ResponseEntity<String>("No news title or content entered!", HttpStatus.BAD_REQUEST);
-		ComicBookNews article = newsRepo.getOne(aId);
+		ComicBookNews article = newsRepo.findById(aId).orElseThrow(() -> new NoSuchResourceException("news article"));
 		title = miscFunc.sanitizeHTMLAntiSamy(title);
 		content = miscFunc.sanitizeHTMLAntiSamy(content);
 		article.setNewsArticleTitle(title);
@@ -298,21 +306,23 @@ public class RESTVuetify {
 	public ResponseEntity<String> deleteNewsArticle(@RequestHeader("USER-TOKEN") String token, @RequestParam("aId") long aId) {
 		if (!jwt.decodeJwt(token, "admins")) 
 			return new ResponseEntity<String>("Couldn't edit news article!", HttpStatus.FORBIDDEN);
-		newsRepo.deleteById(aId);
+		if (newsRepo.findById(aId).isPresent())
+			newsRepo.deleteById(aId);
+		else return new ResponseEntity<String>("Couldn't delete news article!", HttpStatus.BAD_REQUEST);
 		return new ResponseEntity<String>("Deleted news article successfully!", HttpStatus.OK);
 	}
 	
 	// Checked for validation - 11/4/2020
 	@PutMapping("/editAnnouncement")
 	public ResponseEntity<String> saveEditAnnouncement(@RequestHeader("USER-TOKEN") String token, @RequestParam("aId") long annId, 
-			@RequestParam("annTitle") String annTitle, @RequestParam("annContent") String annContent ) throws ScanException, PolicyException {
+			@RequestParam("annTitle") String annTitle, @RequestParam("annContent") String annContent ) throws ScanException, PolicyException, NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins")) 
 			return new ResponseEntity<String>("Couldn't edit announcement!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(annTitle) || !FieldValidation.isNotEmptyOrNull(annContent)) 
 			return new ResponseEntity<String>("No news title or news content entered!", HttpStatus.BAD_REQUEST);
 		annTitle = miscFunc.sanitizeHTMLAntiSamy(annTitle);
 		annContent = miscFunc.sanitizeHTMLAntiSamy(annContent);
-		Announcement ann = announceRepo.getOne(annId);
+		Announcement ann = announceRepo.findById(annId).orElseThrow(() -> new NoSuchResourceException("announcement"));
 		ann.setAnnTitle(annTitle);
 		ann.setAnnContent(annContent);
 		announceRepo.save(ann);
@@ -322,10 +332,10 @@ public class RESTVuetify {
 	
 	// Checked for validation - 11/4/2020
 	@DeleteMapping("/delComic")
-	public ResponseEntity<String> deleteComic(@RequestHeader("USER-TOKEN") String accessToken,@RequestParam("cId") long comicId) {
+	public ResponseEntity<String> deleteComic(@RequestHeader("USER-TOKEN") String accessToken,@RequestParam("cId") long comicId) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(accessToken, "admins")) 
 			return new ResponseEntity<String>("Could not complete comic deletion!", HttpStatus.BAD_REQUEST);
-		comicRepo.delete(comicRepo.findByComicId(comicId));
+		comicRepo.delete(comicRepo.findByComicId(comicId).orElseThrow(() -> new NoSuchResourceException("comic")));
 		return new ResponseEntity<String>("Comic deleted successfully!", HttpStatus.OK);
 	}
 	
@@ -353,10 +363,10 @@ public class RESTVuetify {
 	
 	// Checked for validation - 11/5/2020
 	@PutMapping("/approveSuggestedComic")
-	public ResponseEntity<String> saveApprovedComic(@RequestHeader("USER-TOKEN") String token,@RequestParam("cid") Long comicId ) {
+	public ResponseEntity<String> saveApprovedComic(@RequestHeader("USER-TOKEN") String token,@RequestParam("cid") Long comicId ) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins")) 
 			return new ResponseEntity<String>("Cannot approve comic!", HttpStatus.FORBIDDEN);
-		ComicSuggestion suggComic = comicSuggestRepo.getOne(comicId);
+		ComicSuggestion suggComic = comicSuggestRepo.findById(comicId).orElseThrow(() -> new NoSuchResourceException("suggested comic"));
 		Comic appComic = new Comic(suggComic.getSuggestedComicName(), suggComic.getSuggestedAuthorName(), suggComic.getSuggestedReleaseDate(), 
 				suggComic.getReleaseStatus(), suggComic.getBuyComicURL(), suggComic.getComicCoverURL(), suggComic.getSeriesURL(), suggComic.getPrice());
 		comicRepo.save(appComic);
@@ -371,18 +381,18 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getAnnouncement")
-	public Announcement getAnnouncement(@RequestParam("aId") long announcementId) {
-		return announceRepo.getOne(announcementId);
+	public Announcement getAnnouncement(@RequestParam("aId") long announcementId) throws NoSuchResourceException {
+		return announceRepo.findById(announcementId).orElseThrow(() -> new NoSuchResourceException("announcement"));
 	}
 	
 	// Checked for validation - 11/5/2020
 	@PostMapping("/rateReview")
-	public ResponseEntity<String> rateReview(@RequestHeader("USER-TOKEN") String token,@RequestParam("u") String username,@RequestParam("rId") long reviewId, @RequestParam("r") String ratingType) {
+	public ResponseEntity<String> rateReview(@RequestHeader("USER-TOKEN") String token,@RequestParam("u") String username,@RequestParam("rId") long reviewId, @RequestParam("r") String ratingType) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "users")) 
 			return new ResponseEntity<String>("Cannot rate announcement!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(username) || !FieldValidation.isNotEmptyOrNull(ratingType)) 
 			return new ResponseEntity<String>("Something went wrong while rating the review - check your input and try again!", HttpStatus.BAD_REQUEST);
-		ComicReview rev = reviewRepo.getOne(reviewId);
+		ComicReview rev = reviewRepo.findById(reviewId).orElseThrow(() -> new NoSuchResourceException("comic review"));
 		Map<String,String> users = rev.getRatedByUsers();
 		rev = miscFunc.getReviewRating(ratingType, rev, users, username);
 		users.put(username, ratingType);
@@ -393,12 +403,12 @@ public class RESTVuetify {
 	
 	// Checked for validation - 11/7/2020
 	@PostMapping("/rateAnnouncement")
-	public ResponseEntity<String> rateAnnouncement(@RequestHeader("USER-TOKEN") String token,@RequestParam("u") String username, @RequestParam("aId") long annId, @RequestParam("r") String ratingType) {
+	public ResponseEntity<String> rateAnnouncement(@RequestHeader("USER-TOKEN") String token,@RequestParam("u") String username, @RequestParam("aId") long annId, @RequestParam("r") String ratingType) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "users")) 
 			return new ResponseEntity<String>("Cannot rate announcement!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(username) || !FieldValidation.isNotEmptyOrNull(ratingType)) 
 			return new ResponseEntity<String>("Something went wrong while rating the announcement - check your input and try again!", HttpStatus.BAD_REQUEST);
-		Announcement ann = announceRepo.getOne(annId);
+		Announcement ann = announceRepo.findById(annId).orElseThrow(() -> new NoSuchResourceException("announcement"));
 		Map<String,String> users = ann.getRatedByUsers();
 		ann = miscFunc.getAnnRating(ratingType,ann, users, username);
 		users.put(username, ratingType);
@@ -409,12 +419,12 @@ public class RESTVuetify {
 	
 	// Checked for validation - 11/8/2020
 	@PostMapping("/rateArticle")
-	public ResponseEntity<String> rateArticle(@RequestHeader("USER-TOKEN") String token,@RequestParam("u") String username, @RequestParam("aId") long annId, @RequestParam("r") String ratingType) {
+	public ResponseEntity<String> rateArticle(@RequestHeader("USER-TOKEN") String token,@RequestParam("u") String username, @RequestParam("aId") long annId, @RequestParam("r") String ratingType) throws NoSuchResourceException  {
 		if (!jwt.decodeJwt(token, "users")) 
 			return new ResponseEntity<String>("Cannot rate article!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(username) || !FieldValidation.isNotEmptyOrNull(ratingType)) 
 			return new ResponseEntity<String>("Something went wrong while rating the article - check your input and try again!", HttpStatus.BAD_REQUEST);
-		ComicBookNews news = newsRepo.getOne(annId);
+		ComicBookNews news = newsRepo.findById(annId).orElseThrow(() -> new NoSuchResourceException("news article"));
 		Map<String,String> users = news.getRatedByUsers();
 		news = miscFunc.getNewsRating(ratingType, news, users, username);
 		users.put(username, ratingType);
@@ -424,40 +434,35 @@ public class RESTVuetify {
 	}
 	
 	@PutMapping("/rejectSuggestedComic")
-	public ResponseEntity<String> rejectSuggestedComic(@RequestHeader("USER-TOKEN") String token,@RequestParam("cid") Long comicId) {
+	public ResponseEntity<String> rejectSuggestedComic(@RequestHeader("USER-TOKEN") String token,@RequestParam("cid") Long comicId) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins")) 
 			return new ResponseEntity<String>("Cannot reject comic!", HttpStatus.FORBIDDEN);
-		ComicSuggestion suggComic = comicSuggestRepo.getOne(comicId);
+		ComicSuggestion suggComic = comicSuggestRepo.findById(comicId).orElseThrow(() -> new NoSuchResourceException("suggested comic"));
 		comicSuggestRepo.delete(suggComic);
 		return new ResponseEntity<String>("Successfully rejected comic!", HttpStatus.OK);
 	}
 	
 	@GetMapping("/getSuggestion")
-	public ComicSuggestion getSuggestion(@RequestParam("id") long suggId) {
-		return comicSuggestRepo.getOne(suggId);
+	public ComicSuggestion getSuggestion(@RequestParam("id") long suggId) throws NoSuchResourceException {
+		return comicSuggestRepo.findById(suggId).orElseThrow(() -> new NoSuchResourceException("comic suggestion"));
 	}
 	
 	@GetMapping("/getRating")
 	public ComicRating getRating(@RequestParam("u") String user, @RequestParam("cId") long comicId)
 	{
-		return ratingRepo.findByUserAndComicId(user, comicId);
+		return ratingRepo.findByUserAndComicId(user, comicId).orElseGet(ComicRating::new);
 	}
 	
 	// Checked for validation - 11/8/2020
 	@PostMapping("/setRating")
-	public ResponseEntity<String> setComicRatingForUser(@RequestHeader("USER-TOKEN") String token,@RequestParam("u") String user, @RequestParam("r") int rating, @RequestParam("cId") long comicId) {
+	public ResponseEntity<String> setComicRatingForUser(@RequestHeader("USER-TOKEN") String token,@RequestParam("u") String user, @RequestParam("r") int rating, @RequestParam("cId") long comicId)  {
 		if (!jwt.decodeJwt(token, "users")) 
 			return new ResponseEntity<String>("Couldn't update the rating for this comic!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(user)) 
 			return new ResponseEntity<String>("Something went wrong while rating the review - check your input and try again!", HttpStatus.BAD_REQUEST);
-		ComicRating comicRating = ratingRepo.findByUserAndComicId(user,comicId);
-		if (comicRating != null) {
-			comicRating.setRating(rating);
-			ratingRepo.save(comicRating);
-		} else {
-			comicRating = new ComicRating(rating,user,comicId);
-			ratingRepo.save(comicRating);
-		}
+		ComicRating comicRating = ratingRepo.findByUserAndComicId(user,comicId).orElseGet(() -> new ComicRating(rating, user,comicId));
+		comicRating.setRating(rating);
+		ratingRepo.save(comicRating);
 		return new ResponseEntity<String>("Successfully updated your rating for this comic!", HttpStatus.OK);
 	}
 	
@@ -465,7 +470,9 @@ public class RESTVuetify {
 	public ResponseEntity<String> deleteReview(@RequestHeader("USER-TOKEN") String token, @RequestParam("rId") long rId) {
 		if (!jwt.decodeJwt(token, "admins"))
 			return new ResponseEntity<String>("Couldn't delete review!", HttpStatus.FORBIDDEN);
-		reviewRepo.deleteById(rId);
+		if (reviewRepo.findById(rId).isPresent())
+			reviewRepo.deleteById(rId);
+		else return new ResponseEntity<String>("Couldn't delete review!", HttpStatus.BAD_REQUEST);
 		return new ResponseEntity<String>("Deleted review successfully!", HttpStatus.OK);
 	}
 	
@@ -474,13 +481,13 @@ public class RESTVuetify {
 	public ResponseEntity<String> submitSuggestionEdit(@RequestHeader("USER-TOKEN") String token,@RequestParam("id") long suggId,
 			@RequestParam("comicName") String comicName,@RequestParam("authorName") String authorName,
 			@RequestParam("buyURL") URL buyURL, @RequestParam("coverURL") URL coverURL,
-			@RequestParam("comicReleaseDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate releaseDate) {
+			@RequestParam("comicReleaseDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate releaseDate) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(token,"admins"))
 			return new ResponseEntity<String>("Couldn't submit the edit for this comic suggestion!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isComicNameValid(comicName) || !FieldValidation.containsOnlyLetters(authorName) 
 				|| !FieldValidation.isValidUrl(buyURL.toString()) || !FieldValidation.isValidUrl(coverURL.toString()) || !FieldValidation.isNotEmptyOrNull(releaseDate))
 			return new ResponseEntity<String>("Something went wrong! Check your input and try again!", HttpStatus.BAD_REQUEST);
-		ComicSuggestion editSugg = comicSuggestRepo.getOne(suggId);
+		ComicSuggestion editSugg = comicSuggestRepo.findById(suggId).orElseThrow(() -> new NoSuchResourceException("suggested comic"));
 		editSugg.setSuggestedComicName(comicName);
 		editSugg.setSuggestedAuthorName(authorName);
 		editSugg.setBuyComicURL(buyURL);
@@ -491,8 +498,8 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getPost")
-	public ForumPost getPostById(@RequestParam("pId") long postId) {
-		return postRepo.getOne(postId);
+	public ForumPost getPostById(@RequestParam("pId") long postId) throws NoSuchResourceException {
+		return postRepo.findById(postId).orElseThrow(() -> new NoSuchResourceException("post"));
 	}
 	
 	@GetMapping("/getReviewRequests")
@@ -501,8 +508,8 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getReviewRequest")
-	public ComicReviewRequest getReviewRequest(@RequestParam("rId") long reviewId) {
-		return reviewRequestRepo.getOne(reviewId);
+	public ComicReviewRequest getReviewRequest(@RequestParam("rId") long reviewId) throws NoSuchResourceException {
+		return reviewRequestRepo.findById(reviewId).orElseThrow(() -> new NoSuchResourceException("comic review request"));
 	}
 	
 	// Checked for validation - 11/10/2020
@@ -523,13 +530,15 @@ public class RESTVuetify {
 	public ResponseEntity<String> deleteReviewRequest(@RequestHeader("USER-TOKEN") String userToken, @RequestParam("rId") long requestReviewId) {
 		if (!jwt.decodeJwt(userToken, "admins")) 
 			return new ResponseEntity<String>("Couldn't delete review request!", HttpStatus.FORBIDDEN);
-		reviewRequestRepo.deleteById(requestReviewId);
+		if (reviewRequestRepo.findById(requestReviewId).isPresent())
+			reviewRequestRepo.deleteById(requestReviewId);
+		else return new ResponseEntity<String>("Couldn't delete comic review request!", HttpStatus.BAD_REQUEST);
 		return new ResponseEntity<String>("Review request deleted successfully!", HttpStatus.OK);
 	}
 	
 	// Checked for validation - 11/10/2020
 	@PutMapping("/editPost") 
-	public ResponseEntity<String> savePostEdit(@RequestHeader("USER-TOKEN") String token,@RequestParam("pId") long postId, @RequestParam("content") String postContent, @RequestParam("title") String postTitle) throws ScanException, PolicyException {
+	public ResponseEntity<String> savePostEdit(@RequestHeader("USER-TOKEN") String token,@RequestParam("pId") long postId, @RequestParam("content") String postContent, @RequestParam("title") String postTitle) throws ScanException, PolicyException, NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins"))
 			return new ResponseEntity<String>("Couldn't edit post!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(postContent))
@@ -537,7 +546,7 @@ public class RESTVuetify {
 		// Sanitize the HTML input - mainly removes <script> tags and "javascript:...." in HTML tag attributes
 		postTitle = miscFunc.sanitizeHTMLAntiSamy(postTitle);
 		postContent = miscFunc.sanitizeHTMLAntiSamy(postContent);
-		ForumPost editPost = postRepo.getOne(postId);
+		ForumPost editPost = postRepo.findById(postId).orElseThrow(() -> new NoSuchResourceException("post"));
 		editPost.setPostContent(postContent);
 		editPost.setPostTitle(postTitle);
 		postRepo.save(editPost);
@@ -560,14 +569,14 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getComicSummary")
-	public Comic getComicForSummary(@RequestParam("cId") Long cId) {
-		return comicRepo.findByComicId(cId);
+	public Comic getComicForSummary(@RequestParam("cId") Long cId) throws NoSuchResourceException {
+		return comicRepo.findByComicId(cId).orElseThrow(() -> new NoSuchResourceException("comic"));
 	}
 	
 	// Checked for validation - 11/10/2020
 	@PutMapping("/editReview")
 	public ResponseEntity<String> saveReviewEdit(@RequestHeader("USER-TOKEN") String token, @RequestParam("rId") long reviewId, 
-			@RequestParam("reviewTitle") String title, @RequestParam("reviewContent") String content) throws ScanException, PolicyException {
+			@RequestParam("reviewTitle") String title, @RequestParam("reviewContent") String content) throws ScanException, PolicyException, NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins")) 
 			return new ResponseEntity<String>("Insufficient priviliges to edit comic!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(title) || !FieldValidation.isNotEmptyOrNull(content))
@@ -575,7 +584,7 @@ public class RESTVuetify {
 		// Sanitize both the review title and the review content here below
 		title = miscFunc.sanitizeHTMLAntiSamy(title);
 		content = miscFunc.sanitizeHTMLAntiSamy(content);
-		ComicReview editReview = reviewRepo.findByReviewId(reviewId);
+		ComicReview editReview = reviewRepo.findByReviewId(reviewId).orElseThrow(() -> new NoSuchResourceException("comic review"));
 		editReview.setReviewTitle(title);
 		editReview.setReviewContent(content);
 		reviewRepo.save(editReview);
@@ -583,29 +592,23 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getFavourites")
-	public List<Comic> getUserFavourites(@RequestParam("u") String username) {
+	public List<Comic> getUserFavourites(@RequestParam("u") String username) throws UserNotFoundException {
 		if (!FieldValidation.isNotEmptyOrNull(username))
 			throw new NullPointerException();
-		UserPreferences userPref = userPrefRepo.findByUsername(username);
-		if (userPref != null) {
-			return userPref.getComics();
-		} else {
-			userPref = new UserPreferences(username, new ArrayList<Comic>());
-			return userPref.getComics();
-		}
+		UserPreferences userPref = userPrefRepo.findByUsername(username).orElseGet(() -> new UserPreferences(username, new ArrayList<Comic>()));
+		return userPref.getComics();
 	}
 	
 	// Checked for validation - 11/11/2020
 	@PostMapping("/addFavourite")
-	public ResponseEntity<String> addFavouriteComic(@RequestHeader("USER-TOKEN") String userToken,@RequestParam("u") String username, @RequestParam("cId") Long comicId) {
+	public ResponseEntity<String> addFavouriteComic(@RequestHeader("USER-TOKEN") String userToken,@RequestParam("u") String username, @RequestParam("cId") Long comicId) throws NoSuchResourceException, UserNotFoundException {
 		if (!jwt.decodeJwt(userToken, "users")) 
 			return new ResponseEntity<String>("You must be logged in to favourite a comic!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(username))
 			return new ResponseEntity<String>("Cannot add favourite comic! Exit and login again!", HttpStatus.BAD_REQUEST);
-		UserPreferences userPref = userPrefRepo.findByUsername(username);
-		if (userPref == null) 
-			userPref = new UserPreferences(username, new ArrayList<Comic>());
-		Comic comic = comicRepo.findByComicId(comicId);
+		// Check if comic preferences (favourites) exist for this user - otherwise, create an object to store preferences
+		UserPreferences userPref = userPrefRepo.findByUsername(username).orElseGet(() -> new UserPreferences(username, new ArrayList<Comic>()));
+		Comic comic = comicRepo.findByComicId(comicId).orElseThrow(() -> new NoSuchResourceException("comic"));
 		List<Comic> listOfComics = userPref.getComics();
 		if (listOfComics.contains(comicRepo.getOne(comicId)))
 			return new ResponseEntity<String>("Comic has already been added to Favourites!", HttpStatus.OK);
@@ -658,15 +661,17 @@ public class RESTVuetify {
 	public ResponseEntity<String> deleteContactMessage(@RequestHeader("USER-TOKEN") String token,@RequestParam("cId") long contactId) {
 		if (!jwt.decodeJwt(token, "admins")) 	
 			return new ResponseEntity<String>("Couldn't delete contact message! You need admin rights!", HttpStatus.FORBIDDEN);
-		contactRepo.deleteById(contactId);
+		if (contactRepo.findById(contactId).isPresent())	
+			contactRepo.deleteById(contactId);
+		else return new ResponseEntity<String>("Couldn't delete contact message!", HttpStatus.BAD_REQUEST);
 		return new ResponseEntity<String>("Successfully removed contact message!", HttpStatus.OK);
 	}
 	
 	@GetMapping("/getSuggestions")
-	public List<ComicSuggestion> getSuggestionsByUser(@RequestParam("u") String user, @RequestHeader("USER-TOKEN") String token) {
+	public List<ComicSuggestion> getSuggestionsByUser(@RequestParam("u") String user, @RequestHeader("USER-TOKEN") String token) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "users")) 
 			return new ArrayList<ComicSuggestion>();
-		List<ComicSuggestion> suggestions = comicSuggestRepo.findBySuggesterUsername(user);
+		List<ComicSuggestion> suggestions = comicSuggestRepo.findBySuggesterUsername(user).orElseThrow(() -> new NoSuchResourceException("comic suggestions"));
 		return suggestions;
 	}
 	
@@ -681,13 +686,13 @@ public class RESTVuetify {
 	// Check for validation - 11/12/2020
 	// Method needs a more secure way to identify who the user is 
 	@DeleteMapping("/removeFavourite")
-	public ResponseEntity<String> removeFavouriteComic(@RequestHeader("USER-TOKEN") String token, @RequestParam("u") String username, @RequestParam("cId") Long comicId)
+	public ResponseEntity<String> removeFavouriteComic(@RequestHeader("USER-TOKEN") String token, @RequestParam("u") String username, @RequestParam("cId") Long comicId) throws NoSuchResourceException, UserNotFoundException
 	{
 		// Check for empty username here is handled by BootVuetifyControllerAdvice class - NullPointerException
 		if (!jwt.decodeJwt(token, "users"))
 			return new ResponseEntity<String>("Couldn't remove comic from Favourites!", HttpStatus.FORBIDDEN);
-		UserPreferences userPref = userPrefRepo.findByUsername(username);
-		Comic comic = comicRepo.findByComicId(comicId);
+		UserPreferences userPref = userPrefRepo.findByUsername(username).orElseThrow(() -> new UserNotFoundException());
+		Comic comic = comicRepo.findByComicId(comicId).orElseThrow(() -> new NoSuchResourceException("comic"));
 		List<Comic> listOfComics = userPref.getComics();
 		listOfComics.remove(comic);
 		userPref.setComics(listOfComics);
@@ -696,21 +701,21 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getThread")
-	public ForumThread getThread(@RequestParam("tId") long threadId) {
-		return threadRepo.getOne(threadId);
+	public ForumThread getThread(@RequestParam("tId") long threadId) throws NoSuchResourceException {
+		return threadRepo.findById(threadId).orElseThrow(() -> new NoSuchResourceException("forum thread"));
 	}
 	
 	// Checked for validation - 11/14/2020
 	@PutMapping("/editThread")
 	public ResponseEntity<String> editThread(@RequestHeader("USER-TOKEN") String token,
-			@RequestParam("tId") long threadId, @RequestParam("threadTitle") String title, @RequestParam("threadContent") String threadContent ) throws ScanException, PolicyException {
+			@RequestParam("tId") long threadId, @RequestParam("threadTitle") String title, @RequestParam("threadContent") String threadContent ) throws ScanException, PolicyException, NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins"))
 			return new ResponseEntity<String>("Couldn't edit thread!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(title) || !FieldValidation.isNotEmptyOrNull(threadContent))
 			return new ResponseEntity<String>("Check your input and try again!", HttpStatus.BAD_REQUEST);
 		title = miscFunc.sanitizeHTMLAntiSamy(title);
 		threadContent = miscFunc.sanitizeHTMLAntiSamy(threadContent);
-		ForumThread thread = threadRepo.getOne(threadId);
+		ForumThread thread = threadRepo.findById(threadId).orElseThrow(() -> new NoSuchResourceException("forum thread"));
 		thread.setThreadTopic(title);
 		List<ForumPost> posts = thread.getThreadPosts();
 		posts.get(0).setPostContent(threadContent);
@@ -723,7 +728,7 @@ public class RESTVuetify {
 	@PostMapping("/editComic")
 	public ResponseEntity<String> editComic(@RequestHeader("USER-TOKEN") String accessToken,@RequestParam("cId") long comicId,@RequestParam("comicName") String comicName, 
 			@RequestParam("comicDesc") String comicDesc, @RequestParam("releaseStatus") ComicType releaseStatus,@RequestParam("author") String author,
-			@RequestParam("comicCoverURL") String comicCoverURL, @RequestParam("seriesURL") URL seriesURL,@RequestParam("price") float price, @RequestParam("buyComicURL") String buyURL) throws MalformedURLException {
+			@RequestParam("comicCoverURL") String comicCoverURL, @RequestParam("seriesURL") URL seriesURL,@RequestParam("price") float price, @RequestParam("buyComicURL") String buyURL) throws MalformedURLException, NoSuchResourceException {
 		if (!jwt.decodeJwt(accessToken, "admins")) 
 			return new ResponseEntity<String>("Cannot edit comic!", HttpStatus.BAD_REQUEST);
 		if (!FieldValidation.isComicNameValid(comicName) || !FieldValidation.isNotEmptyOrNull(releaseStatus) || !FieldValidation.containsOnlyLetters(author)
@@ -732,7 +737,7 @@ public class RESTVuetify {
 			return new ResponseEntity<String>("Something went wrong! Check your data and try again!", HttpStatus.BAD_REQUEST);
 		}
 		try {
-			Comic editComic = comicRepo.findById(comicId).get();
+			Comic editComic = comicRepo.findById(comicId).orElseThrow(() -> new NoSuchResourceException("comic"));
 			editComic.setComicName(comicName);
 			editComic.setComicDesc(comicDesc);
 			editComic.setReleaseStatus(releaseStatus);
@@ -750,31 +755,29 @@ public class RESTVuetify {
 		} catch (IllegalArgumentException e) {
 			return new ResponseEntity<String>("Incorrect data for comic!", HttpStatus.BAD_REQUEST);
 		} 
-		catch(NoSuchElementException e) {
-			return new ResponseEntity<String>("No such comic!", HttpStatus.BAD_REQUEST);
-		}
 	}
 	
 	// Checked for validation - 11/14/2020
 	@PostMapping("/postComment")
-	public ResponseEntity<String> saveComment(@RequestHeader("USER-TOKEN") String token,@RequestParam("cId") Long cId) {
+	public ResponseEntity<String> saveComment(@RequestHeader("USER-TOKEN") String token,@RequestParam("cId") Long cId) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "users")) 
 			return new ResponseEntity<String>("Couldn't post your comment!", HttpStatus.FORBIDDEN);
 		if (!FieldValidation.isNotEmptyOrNull(servReq.getParameter("commenterName")) || !FieldValidation.isNotEmptyOrNull(servReq.getParameter("commentContent")))
 			return new ResponseEntity<String>("Empty nickname and/or comment field!", HttpStatus.BAD_REQUEST);
-		ComicComments comment = new ComicComments(servReq.getParameter("commenterName"), servReq.getParameter("commentContent"), LocalDateTime.now(), comicRepo.getOne(cId));
+		ComicComments comment = new ComicComments(servReq.getParameter("commenterName"), servReq.getParameter("commentContent"), LocalDateTime.now(), comicRepo.findById(cId).orElseThrow(() -> new NoSuchResourceException("comic comments")));
 		commentRepo.save(comment);
 		return new ResponseEntity<String>("Successfully posted comment!", HttpStatus.OK);
 	}
 	
 	@GetMapping("/getComments")
-	public List<ComicComments> getComments(@RequestParam("cId") Long cId) {
-		return commentRepo.findAllByCommentedComic(comicRepo.findByComicId(cId));
+	public List<ComicComments> getComments(@RequestParam("cId") Long cId) throws NoSuchResourceException {
+		return commentRepo.findAllByCommentedComic(comicRepo.findByComicId(cId).orElseThrow(() -> new NoSuchResourceException("comic")))
+				.orElseGet(() -> new ArrayList<ComicComments>());
 	}
 	
 	@GetMapping("/getReview")
-	public ComicReview getReview(@RequestParam("rId") Long rId) {
-		return reviewRepo.findByReviewId(rId);
+	public ComicReview getReview(@RequestParam("rId") Long rId) throws NoSuchResourceException {
+		return reviewRepo.findByReviewId(rId).orElseThrow(() -> new NoSuchResourceException("comic review"));
 	}
 	
 	@GetMapping("/getReviews")
@@ -816,22 +819,22 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/getPosts")
-	public List<ForumPost> getPostsForThread(@RequestParam("tId") long threadId) {
-		ForumThread thread = threadRepo.getOne(threadId);
+	public List<ForumPost> getPostsForThread(@RequestParam("tId") long threadId) throws NoSuchResourceException {
+		ForumThread thread = threadRepo.findById(threadId).orElseThrow(() -> new NoSuchResourceException("forum thread"));
 		return thread.getThreadPosts();
 	}
 	
 	// Checked for validation - 11/15/2020
 	@PostMapping("/addPost")
 	public List<ForumPost> addPostAndGetPosts(@RequestHeader("USER-TOKEN") String accessToken,@RequestParam("tId") long threadId,
-			@RequestParam("postTitle") String postTitle, @RequestParam("postContent") String postContent) throws NotLoggedInException, ScanException, PolicyException {
+			@RequestParam("postTitle") String postTitle, @RequestParam("postContent") String postContent) throws NotLoggedInException, ScanException, PolicyException, NoSuchResourceException {
 		if (!jwt.decodeJwt(accessToken, "users")) 
 			throw new NotLoggedInException();
 		if (!FieldValidation.isNotEmptyOrNull(postTitle) || !FieldValidation.isNotEmptyOrNull(postContent))
 			throw new NullPointerException();
 		postTitle = miscFunc.sanitizeHTMLAntiSamy(postTitle);
 		postContent = miscFunc.sanitizeHTMLAntiSamy(postContent);
-		ForumThread thread = threadRepo.findById(threadId).get();
+		ForumThread thread = threadRepo.findById(threadId).orElseThrow(() -> new NoSuchResourceException("forum thread"));
 		LocalDateTime postTime = LocalDateTime.now();
 		ForumPost postNew = new ForumPost(postTitle, postContent, postTime, postTime.format(DateTimeFormatter.ofPattern("yyyy/MM/dd, HH:mm:ss")), thread);
 		postRepo.save(postNew);
@@ -840,10 +843,10 @@ public class RESTVuetify {
 	
 	// Checked for validation - 11/16/2020
 	@DeleteMapping("/delPost")
-	public ResponseEntity<String> deletePost(@RequestHeader("USER-TOKEN") String token, @RequestParam("pId") long postId) {
+	public ResponseEntity<String> deletePost(@RequestHeader("USER-TOKEN") String token, @RequestParam("pId") long postId) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(token, "admins"))
 			return new ResponseEntity<String>("Couldn't delete post!", HttpStatus.FORBIDDEN);
-		ForumPost delPost = postRepo.getOne(postId);
+		ForumPost delPost = postRepo.findById(postId).orElseThrow(() -> new NoSuchResourceException("post"));
 		if (delPost.getOwnerThread().getThreadPosts().size() == 1) {
 			return new ResponseEntity<String>("A forum thread must have at least 1 post! Cannot delete post!", HttpStatus.BAD_REQUEST);
 		}
@@ -1049,10 +1052,10 @@ public class RESTVuetify {
 	}
 	
 	@GetMapping("/delThread")
-	public ResponseEntity<String> deleteThread(@RequestHeader("USER-TOKEN") String accessToken,@RequestParam("tId") long threadId) {
+	public ResponseEntity<String> deleteThread(@RequestHeader("USER-TOKEN") String accessToken,@RequestParam("tId") long threadId) throws NoSuchResourceException {
 		if (!jwt.decodeJwt(accessToken, "admins")) 
 			return new ResponseEntity<String>("Cannot delete thread!",HttpStatus.BAD_REQUEST);
-		threadRepo.delete(threadRepo.getOne(threadId));
+		threadRepo.delete(threadRepo.findById(threadId).orElseThrow(() -> new NoSuchResourceException("forum thread")));
 		return new ResponseEntity<String>("Thread successfully deleted!",HttpStatus.OK);
 	}
 	

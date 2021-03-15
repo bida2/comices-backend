@@ -45,9 +45,55 @@ public class VideoMaterial {
 		this.thumbnail = thumb;
 		this.timePostedFormatted = timePosted.format(DateTimeFormatter.ofPattern("MMM. dd, uuuu 'at' HH:mm:ss a"));
 	}
+	
+	public VideoMaterial(VideoMaterial.Builder builder) {
+		this.embedUrl = builder.embedUrl;
+		this.subtitleHeader = builder.subtitleHeader;
+		this.timePosted = builder.timePosted;
+		this.description = builder.description;
+		this.thumbnail = builder.thumbnail;
+		this.timePostedFormatted = timePosted.format(DateTimeFormatter.ofPattern("MMM. dd, uuuu 'at' HH:mm:ss a"));
+	}
+	
+	public static class Builder {
+		private URL embedUrl;
+		private String subtitleHeader;
+		private LocalDateTime timePosted;
+		private String description;
+		private URL thumbnail;
+		
+		public Builder addEmbedUrl(URL embedUrl) {
+			this.embedUrl = embedUrl;
+			return this;
+		}
+		public Builder addSubtitleHeader(String subtitleHeader) {
+			this.subtitleHeader = subtitleHeader;
+			return this;
+		}
+		public Builder addTimePosted(LocalDateTime timePosted) {
+			this.timePosted = timePosted;
+			return this;
+		}
+		public Builder addDescription(String description) {
+			this.description = description;
+			return this;
+		}
+		public Builder addThumbnail(URL thumbnail) {
+			this.thumbnail = thumbnail;
+			return this;
+		}
+		public VideoMaterial build() {
+			VideoMaterial builderMaterial = new VideoMaterial(this);
+			return builderMaterial;
+		}
+	}
 
-
-
+	// Helper methods 
+	public static Builder builder() {
+		return new VideoMaterial.Builder();
+	}
+	
+	// Getters and Setters
 	public Long getvMaterialId() {
 		return vMaterialId;
 	}

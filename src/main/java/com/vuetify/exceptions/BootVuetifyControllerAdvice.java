@@ -77,4 +77,29 @@ public class BootVuetifyControllerAdvice {
 	 public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException e) {
 		 return new ResponseEntity<String>("Expected data of a different type!", HttpStatus.BAD_REQUEST);
 	 }
+	 
+	 
+	 @ExceptionHandler(NoComicsForTypeException.class)
+	 @ResponseStatus(HttpStatus.NOT_FOUND)
+	 @ResponseBody
+	 public ResponseEntity<String> handleNoComicsForTypeException(NoComicsForTypeException e) {
+		 return new ResponseEntity<String>("Couldn't find any comics for chosen comic release status!", HttpStatus.NOT_FOUND);
+	 }
+	 
+	 
+	 @ExceptionHandler(NoSuchResourceException.class)
+	 @ResponseStatus(HttpStatus.NOT_FOUND)
+	 @ResponseBody
+	 public ResponseEntity<String> handleNoSuchResourceException(NoSuchResourceException e) {
+		 return new ResponseEntity<String>("Couldn't find needed " + e.resourceName + "!", HttpStatus.NOT_FOUND);
+	 }
+	 
+	 @ExceptionHandler(UserNotFoundException.class)
+	 @ResponseStatus(HttpStatus.NOT_FOUND)
+	 @ResponseBody
+	 public ResponseEntity<String> handleUserNotFoundException(UserNotFoundException e) {
+		 return new ResponseEntity<String>("User doesn't exist!", HttpStatus.NOT_FOUND);
+	 }
+	 
+	 
 }

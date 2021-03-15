@@ -7,6 +7,7 @@ import javax.persistence.Id;
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
 
+
 @Entity
 public class ComicRating {
 	@Id
@@ -20,6 +21,7 @@ public class ComicRating {
 	private String user;
 	@Column(name="rated_comic_id", nullable=false)
 	private long comicId;
+	
 	
 	public ComicRating() {}
 	
@@ -60,6 +62,9 @@ public class ComicRating {
 	public void setComicId(long comicId) {
 		this.comicId = comicId;
 	}
+
+	
+
 	
 	
 }

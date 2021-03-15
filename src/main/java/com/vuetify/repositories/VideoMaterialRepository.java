@@ -7,5 +7,5 @@ import com.vuetify.entities.VideoMaterial;
 
 @Repository
 public interface VideoMaterialRepository extends JpaRepository<VideoMaterial,Long> {
-
+	
 }
