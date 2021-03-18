@@ -1,5 +1,6 @@
 package com.vuetify.utils;
 
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,7 +26,7 @@ public class FieldValidation {
 			    Matcher matcher = pattern.matcher(number.toString());
 			    return matcher.find();
 		}
-	
+		
 		// Format must be a valid URL adress
 		public static Boolean isValidUrl(String url) {
 				Pattern pattern = Pattern.compile("https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,4}\\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)");

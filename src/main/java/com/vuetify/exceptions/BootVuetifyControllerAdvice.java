@@ -11,8 +11,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+
 @ControllerAdvice
 public class BootVuetifyControllerAdvice {
+
+	
 	 @ExceptionHandler(NumberFormatException.class)
      @ResponseStatus(HttpStatus.BAD_REQUEST)
      @ResponseBody
@@ -78,13 +81,6 @@ public class BootVuetifyControllerAdvice {
 		 return new ResponseEntity<String>("Expected data of a different type!", HttpStatus.BAD_REQUEST);
 	 }
 	 
-	 
-	 @ExceptionHandler(NoComicsForTypeException.class)
-	 @ResponseStatus(HttpStatus.NOT_FOUND)
-	 @ResponseBody
-	 public ResponseEntity<String> handleNoComicsForTypeException(NoComicsForTypeException e) {
-		 return new ResponseEntity<String>("Couldn't find any comics for chosen comic release status!", HttpStatus.NOT_FOUND);
-	 }
 	 
 	 
 	 @ExceptionHandler(NoSuchResourceException.class)

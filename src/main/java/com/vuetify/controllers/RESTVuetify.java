@@ -76,7 +76,6 @@ import com.vuetify.entities.UserPreferences;
 import com.vuetify.entities.VideoMaterial;
 import com.vuetify.enums.ComicType;
 import com.vuetify.exceptions.ComicBookNameExistsException;
-import com.vuetify.exceptions.NoComicsForTypeException;
 import com.vuetify.exceptions.NoSuchResourceException;
 import com.vuetify.exceptions.NotLoggedInException;
 import com.vuetify.exceptions.UserNotFoundException;
@@ -172,8 +171,8 @@ public class RESTVuetify {
 
 	
 	@GetMapping("/comicType")
-	public List<Comic> getByComicType(@RequestParam("t") ComicType type) throws NoComicsForTypeException {
-		return comicRepo.findByStatus(type).orElseThrow(() -> new NoComicsForTypeException());
+	public List<Comic> getByComicType(@RequestParam("t") ComicType type) {
+		return comicRepo.findByStatus(type).orElseGet(() -> new ArrayList<Comic>());
 	}
 	
 	@GetMapping("/authors")
@@ -253,13 +252,11 @@ public class RESTVuetify {
 			return new ResponseEntity<String>("Incorrect or missing data - check your entered information and try again!", HttpStatus.BAD_REQUEST);
 		}
 		VideoMaterial video = null;
-		if (thumbUrl.isEmpty() || thumbUrl == null) {
-			video = VideoMaterial.builder().addEmbedUrl(new URL(embedUrl))
-					.addSubtitleHeader(videoTitle).addDescription(desc).addTimePosted(LocalDateTime.now()).build();
-		} else {
-			video = VideoMaterial.builder().addEmbedUrl(new URL(embedUrl)).addSubtitleHeader(videoTitle)
+		video = thumbUrl.isEmpty() || thumbUrl == null ? 
+		VideoMaterial.builder().addEmbedUrl(new URL(embedUrl)).addSubtitleHeader(videoTitle).addDescription(desc).addTimePosted(LocalDateTime.now()).build()
+		:
+		VideoMaterial.builder().addEmbedUrl(new URL(embedUrl)).addSubtitleHeader(videoTitle)
 					.addDescription(desc).addTimePosted(LocalDateTime.now()).addThumbnail(new URL(thumbUrl)).build();
-		}
 		videoRepo.save(video);
 		return new ResponseEntity<String>("Successfully saved video material!", HttpStatus.OK);
 		
@@ -660,7 +657,7 @@ public class RESTVuetify {
 	@DeleteMapping("/deleteContact")
 	public ResponseEntity<String> deleteContactMessage(@RequestHeader("USER-TOKEN") String token,@RequestParam("cId") long contactId) {
 		if (!jwt.decodeJwt(token, "admins")) 	
-			return new ResponseEntity<String>("Couldn't delete contact message! You need admin rights!", HttpStatus.FORBIDDEN);
+			return new ResponseEntity<String>("Couldn't delete contact message!", HttpStatus.FORBIDDEN);
 		if (contactRepo.findById(contactId).isPresent())	
 			contactRepo.deleteById(contactId);
 		else return new ResponseEntity<String>("Couldn't delete contact message!", HttpStatus.BAD_REQUEST);
