@@ -13,6 +13,7 @@ spring.datasource.url=<your database URL>
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 spring.datasource.username=<your database username>
 spring.datasource.password=<your database password>
+api.sendgrid.key= <your SendGrid API key>
 ```
 
 After you run both the frontend and backend part of this project, you can access it all at localhost:9000
