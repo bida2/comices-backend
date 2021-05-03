@@ -2,6 +2,8 @@ package com.vuetify.services;
 
 import java.io.IOException;
 
+import org.hibernate.cfg.Environment;
+
 import com.sendgrid.Method;
 import com.sendgrid.Request;
 import com.sendgrid.SendGrid;
@@ -18,17 +20,13 @@ public class EmailService {
 	    Content content = new Content("text/html", finalMessage);
 	    Mail mail = new Mail(from, subject, to, content);
 
-	    SendGrid sg = new SendGrid("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");
+	    SendGrid sg = new SendGrid(Environment.getProperties().getProperty("api.sendgrid.key"));
 	    Request request = new Request();
 	    try {
 	      request.setMethod(Method.POST);
 	      request.setEndpoint("mail/send");
 	      request.setBody(mail.build());
 	      sg.api(request);
-	     // Response response = sg.api(request);
-	     // System.out.println(response.getStatusCode());
-	     // System.out.println(response.getBody());
-	     // System.out.println(response.getHeaders());
 	    } catch (IOException ex) {
 	      throw ex;
 	    }
